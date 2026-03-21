@@ -1,38 +1,51 @@
 from fastapi import APIRouter, Form, Cookie, HTTPException, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pydantic import BaseModel
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SECRET_KEY      = os.getenv("SECRET_KEY", "changeme_supersecret_key")
-ADMIN_USERNAME  = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD", "pitchcoach123")
-ALGORITHM       = "HS256"
+SECRET_KEY         = os.getenv("SECRET_KEY", "changeme_supersecret_key")
+ALGORITHM          = "HS256"
 TOKEN_EXPIRE_HOURS = 8
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-pwd_context     = CryptContext(schemes=["bcrypt"], deprecated="auto")
-HASHED_PASSWORD = pwd_context.hash(ADMIN_PASSWORD[:72])
+# ── Password hashing ──────────────────────────────────────────────────────────
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter()
 
+# ── MongoDB users collection (injected from app.py) ───────────────────────────
+users_collection = None
 
+def set_users_collection(collection):
+    """Called from app.py to inject the MongoDB users collection."""
+    global users_collection
+    users_collection = collection
+
+
+# ── Pydantic model for signup ─────────────────────────────────────────────────
+class SignupRequest(BaseModel):
+    fullname: str
+    username: str
+    email:    str
+    password: str
+
+
+# ── Token helpers ─────────────────────────────────────────────────────────────
 def create_token(username: str) -> str:
-    """Create a signed JWT token valid for TOKEN_EXPIRE_HOURS hours."""
     payload = {
         "sub": username,
-        "exp": datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verify_token(token: str = Cookie(default=None)):
-    """
-    Dependency — call this with Depends(verify_token) on any protected route.
-    Raises a redirect to /login if the token is missing or invalid.
-    """
     if not token:
         raise HTTPException(status_code=302, headers={"Location": "/login"})
     try:
@@ -42,12 +55,27 @@ def verify_token(token: str = Cookie(default=None)):
     return token
 
 
+def get_current_username(token: str = Cookie(default=None)) -> str:
+    if not token:
+        raise HTTPException(status_code=302, headers={"Location": "/login"})
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub", "")
+    except JWTError:
+        raise HTTPException(status_code=302, headers={"Location": "/login"})
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page():
-    """Serve the login HTML page."""
-    with open("login.html", "r", encoding="utf-8") as f:
+    with open("templates/login.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@router.get("/signup", response_class=HTMLResponse)
+async def signup_page():
+    with open("templates/signup.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 
@@ -56,29 +84,59 @@ async def do_login(
     username: str = Form(...),
     password: str = Form(...),
 ):
-    """Validate credentials, set cookie, redirect to app."""
-    valid_user = username == ADMIN_USERNAME
-    valid_pass = pwd_context.verify(password, HASHED_PASSWORD)
+    if users_collection is None:
+        return RedirectResponse(url="/login?error=db", status_code=302)
 
-    if not valid_user or not valid_pass:
-        # Redirect back to login with an error flag
+    user = users_collection.find_one({"username": username})
+    if not user:
+        return RedirectResponse(url="/login?error=1", status_code=302)
+
+    if not pwd_context.verify(password[:72], user["hashed_password"]):
         return RedirectResponse(url="/login?error=1", status_code=302)
 
     token    = create_token(username)
-    response = RedirectResponse(url="/", status_code=302)
+    response = RedirectResponse(url="/app", status_code=302)
     response.set_cookie(
         key="token",
         value=token,
-        httponly=True,       # JS cannot read this cookie
-        samesite="lax",      # CSRF protection
+        httponly=True,
+        samesite="lax",
         max_age=TOKEN_EXPIRE_HOURS * 3600,
     )
     return response
 
 
+@router.post("/api/auth/signup")
+async def do_signup(data: SignupRequest):
+    if users_collection is None:
+        raise HTTPException(status_code=500, detail="Database not configured.")
+
+    if users_collection.find_one({"username": data.username}):
+        raise HTTPException(status_code=400, detail="Username already taken.")
+
+    if users_collection.find_one({"email": data.email}):
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    if len(data.username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
+
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+
+    hashed = pwd_context.hash(data.password[:72])
+    users_collection.insert_one({
+        "fullname":        data.fullname,
+        "username":        data.username,
+        "email":           data.email,
+        "hashed_password": hashed,
+        "created_at":      datetime.now(timezone.utc),
+    })
+
+    return JSONResponse({"message": "Account created successfully!"})
+
+
 @router.get("/logout")
 async def logout():
-    """Clear the session cookie and redirect to login."""
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("token")
     return response

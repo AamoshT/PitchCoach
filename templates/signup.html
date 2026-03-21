@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PitchCoach.AI | Create Account</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030014; background-image: radial-gradient(circle at 50% -20%, #3e2bce22, transparent), radial-gradient(circle at 0% 100%, #6366f111, transparent); }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .gradient-text { background: linear-gradient(to right, #818cf8, #c084fc, #ff67b3); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .glow-btn { box-shadow: 0 0 20px rgba(99,102,241,0.4); transition: all 0.3s ease; }
+        .glow-btn:hover { box-shadow: 0 0 35px rgba(99,102,241,0.6); transform: translateY(-2px); }
+        .input-field { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s; }
+        .input-field:focus { outline: none; border-color: rgba(99,102,241,0.6); background: rgba(99,102,241,0.06); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .alert { display:none; border-radius:12px; padding:12px 16px; font-size:13px; margin-bottom:20px; align-items:center; gap:8px; }
+        .alert.error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); color:#fca5a5; }
+        .alert.success { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:#86efac; }
+        .alert.show { display:flex; }
+        .strength-track { height:4px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin-top:8px; }
+        .strength-fill { height:100%; width:0%; border-radius:4px; transition:all 0.3s; }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col selection:bg-indigo-500/30">
+
+    <nav class="flex justify-between items-center px-10 py-8 max-w-7xl mx-auto w-full">
+        <a href="/" class="text-2xl font-extrabold tracking-tighter flex items-center gap-2 text-white" style="text-decoration:none">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg rotate-12 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+                <span class="text-white text-sm" style="transform:rotate(-12deg);display:block">AI</span>
+            </div>
+            PitchCoach.AI
+        </a>
+        <div class="hidden md:flex space-x-10 text-sm font-medium text-gray-400">
+            <a href="#" class="hover:text-white transition">Analysis</a>
+            <a href="#" class="hover:text-white transition">Pricing</a>
+            <a href="#" class="hover:text-white transition">Enterprise</a>
+        </div>
+        <a href="/login" class="glass px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-white/10 transition" style="text-decoration:none">Sign In</a>
+    </nav>
+
+    <div class="flex-1 flex items-center justify-center px-6 py-12">
+        <div class="w-full max-w-md">
+
+            <div class="text-center mb-8">
+                <div class="inline-block px-4 py-1.5 mb-6 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-widest">
+                    Get Started Free
+                </div>
+                <h1 class="text-4xl font-extrabold tracking-tight mb-3">
+                    Join <span class="gradient-text">PitchCoach</span>
+                </h1>
+                <p class="text-gray-400 text-sm">Start mastering your pitch today</p>
+            </div>
+
+            <div class="glass rounded-3xl p-8">
+
+                <div class="alert error" id="errorBanner"><span>⚠</span><span id="errorText">Something went wrong.</span></div>
+                <div class="alert success" id="successBanner"><span>✅</span><span>Account created! Redirecting to login...</span></div>
+
+                <form id="signupForm">
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Full Name</label>
+                        <input id="fullname" type="text" placeholder="Your full name" required class="input-field w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-600" />
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Username</label>
+                        <input id="username" type="text" placeholder="Choose a username" autocomplete="username" required class="input-field w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-600" />
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Email</label>
+                        <input id="email" type="email" placeholder="your@email.com" autocomplete="email" required class="input-field w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-600" />
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Password</label>
+                        <div class="relative">
+                            <input id="password" type="password" placeholder="Create a strong password" required class="input-field w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-600 pr-16" />
+                            <button type="button" id="pwToggle" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs font-semibold transition">show</button>
+                        </div>
+                        <div class="strength-track"><div class="strength-fill" id="strengthFill"></div></div>
+                        <p class="text-xs text-gray-600 mt-1" id="strengthLabel"></p>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Confirm Password</label>
+                        <input id="confirmPassword" type="password" placeholder="Repeat your password" required class="input-field w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-600" />
+                    </div>
+                    <button type="submit" id="submitBtn" class="glow-btn bg-indigo-600 w-full py-4 rounded-2xl text-base font-bold transition">Create Account →</button>
+                </form>
+
+                <div class="flex items-center gap-3 my-6">
+                    <div class="flex-1 h-px bg-white/10"></div>
+                    <span class="text-gray-600 text-xs">or</span>
+                    <div class="flex-1 h-px bg-white/10"></div>
+                </div>
+
+                <div class="text-center text-sm text-gray-500">
+                    Already have an account?
+                    <a href="/login" class="text-indigo-400 font-semibold hover:text-indigo-300 transition ml-1">Sign in</a>
+                </div>
+            </div>
+
+            <p class="text-center text-xs text-gray-600 mt-6 tracking-widest uppercase">Free to use · No credit card required</p>
+        </div>
+    </div>
+
+    <footer class="text-center py-8 border-t border-white/5 opacity-50 text-xs tracking-widest font-bold uppercase">© 2026 PitchCoach.AI — Built for DigitalOcean Inference</footer>
+
+    <script>
+        // Password toggle
+        const pwToggle = document.getElementById("pwToggle");
+        const pwInput  = document.getElementById("password");
+        pwToggle.addEventListener("click", () => {
+            const hidden = pwInput.type === "password";
+            pwInput.type = hidden ? "text" : "password";
+            pwToggle.textContent = hidden ? "hide" : "show";
+        });
+
+        // Strength meter
+        const strengthFill  = document.getElementById("strengthFill");
+        const strengthLabel = document.getElementById("strengthLabel");
+        pwInput.addEventListener("input", () => {
+            const v = pwInput.value;
+            let score = 0;
+            if (v.length >= 8)          score++;
+            if (/[A-Z]/.test(v))        score++;
+            if (/[0-9]/.test(v))        score++;
+            if (/[^A-Za-z0-9]/.test(v)) score++;
+            const levels = [
+                { label: "",         color: "transparent", width: "0%" },
+                { label: "Weak",     color: "#ef4444",     width: "25%" },
+                { label: "Fair",     color: "#f97316",     width: "50%" },
+                { label: "Good",     color: "#eab308",     width: "75%" },
+                { label: "Strong",   color: "#22c55e",     width: "100%" },
+            ];
+            strengthFill.style.width           = levels[score].width;
+            strengthFill.style.backgroundColor = levels[score].color;
+            strengthLabel.textContent          = levels[score].label;
+        });
+
+        // Alerts
+        function showError(msg) {
+            document.getElementById("errorText").textContent = msg;
+            document.getElementById("errorBanner").classList.add("show");
+            document.getElementById("successBanner").classList.remove("show");
+        }
+        function showSuccess() {
+            document.getElementById("successBanner").classList.add("show");
+            document.getElementById("errorBanner").classList.remove("show");
+        }
+
+        // Submit
+        document.getElementById("signupForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const fullname        = document.getElementById("fullname").value.trim();
+            const username        = document.getElementById("username").value.trim();
+            const email           = document.getElementById("email").value.trim();
+            const password        = document.getElementById("password").value;
+            const confirmPassword = document.getElementById("confirmPassword").value;
+            const btn             = document.getElementById("submitBtn");
+
+            if (password !== confirmPassword) { showError("Passwords do not match!"); return; }
+            if (password.length < 6)          { showError("Password must be at least 6 characters."); return; }
+
+            btn.disabled = true;
+            btn.textContent = "Creating account...";
+
+            try {
+                const response = await fetch("/api/auth/signup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ fullname, username, email, password }),
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    showError(result.detail || "Signup failed. Please try again.");
+                    btn.disabled = false;
+                    btn.textContent = "Create Account →";
+                    return;
+                }
+                showSuccess();
+                setTimeout(() => { window.location.href = "/login"; }, 1500);
+            } catch (err) {
+                showError("Network error. Please try again.");
+                btn.disabled = false;
+                btn.textContent = "Create Account →";
+            }
+        });
+    </script>
+</body>
+</html>

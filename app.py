@@ -1,29 +1,27 @@
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from pymongo import MongoClient
-from bson import ObjectId
-from datetime import datetime
-import uvicorn
-import tempfile
+from fastapi.responses import FileResponse
+from fastapi import FastAPI, UploadFile, File, Form, Depends 
+from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.responses import FileResponse, JSONResponse 
+from fastapi.staticfiles import StaticFiles
+from pymongo import MongoClient 
+from bson import ObjectId 
+from datetime import datetime, timezone
+import uvicorn  
+import tempfile 
 import os
 import json
 import requests
-from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
+from dotenv import load_dotenv 
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks 
 import shutil
 import re
-
-#auth imports 
-from auth import router as auth_router, verify_token
-from fastapi import Depends
 
 load_dotenv()
 
 app = FastAPI()
-
-# Include the authentication router
+from auth import router as auth_router, verify_token, set_users_collection
 app.include_router(auth_router)
+app.mount("/static", StaticFiles(directory="."), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +40,10 @@ DO_GRADIENT_MODEL = os.getenv("DO_GRADIENT_MODEL", "openai-gpt-oss-20b")
 mongo_client = MongoClient(MONGO_URI) if MONGO_URI else None
 database = mongo_client["pitchcoach"] if mongo_client is not None else None
 sessions_collection = database["pitch_sessions"] if database is not None else None
+users_collection = database["users"] if database is not None else None
+
+set_users_collection(users_collection)
+
 POSE_POINTS = {
     "nose": 0,
     "left_shoulder": 11,
@@ -65,11 +67,18 @@ CONNECTIONS = [
     ["left_hip", "right_hip"],
 ]
 
+# Change your route to look inside the folder
 @app.get("/")
-#@Depends(verify_token)
-async def serve_index_file( token: str = Depends(verify_token)):
-    return FileResponse("index.html")
+async def serve_index_file():
+    return FileResponse("templates/index.html")
 
+@app.get("/app")
+async def serve_app(token: str = Depends(verify_token)):
+    return FileResponse("templates/recorder.html")
+
+@app.get("/recorder")
+async def serve_recorder(token: str = Depends(verify_token)):
+    return FileResponse("templates/recorder.html")
 
 def calculate_summary_scores(pose_frames: list):
     if not pose_frames:
@@ -330,7 +339,6 @@ async def upload_pitch_session(
     video: UploadFile = File(...),
     pose_frames_json: str = Form(...),
     duration_ms: int = Form(...),
-    token: str = Depends(verify_token),
 ):
     if sessions_collection is None:
         return JSONResponse(
@@ -352,7 +360,7 @@ async def upload_pitch_session(
         summary_scores = calculate_summary_scores(pose_frames)
 
         initial_document = {
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "duration_ms": duration_ms,
             "media_filename": os.path.basename(temporary_media_path),
             "media_mime_type": video.content_type,
@@ -403,7 +411,7 @@ async def upload_pitch_session(
 
 
 @app.get("/api/pitch/{session_id}")
-async def get_pitch_session(session_id: str, token: str = Depends(verify_token)):
+async def get_pitch_session(session_id: str):
     if sessions_collection is None:
         return JSONResponse({"error": "MongoDB is not configured."}, status_code=500)
 
