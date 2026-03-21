@@ -1,0 +1,607 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pitch Practice Coach</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 28px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      background: #1f2937;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+    }
+
+    video,
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    video {
+      object-fit: cover;
+      background: #000;
+    }
+
+    canvas {
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #4b5563;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 12px;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .metric {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pitch Practice Coach</h1>
+    <p>Record your pitch, upload it to Python, and replay it with body landmark overlay.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Live Camera</h2>
+        <div class="video-wrap">
+          <video id="liveVideo" autoplay playsinline muted></video>
+          <canvas id="liveOverlayCanvas"></canvas>
+        </div>
+
+        <div class="controls">
+          <button id="startCameraButton">Start Camera</button>
+          <button id="startRecordButton" disabled>Start Recording</button>
+          <button id="stopRecordButton" disabled>Stop Recording</button>
+          <button id="analyzeButton" disabled>Analyze Pitch</button>
+        </div>
+
+        <div class="status" id="recordingStatus">Camera not started.</div>
+      </div>
+
+      <div class="card">
+        <h2>Scores</h2>
+        <div id="scoresBox">
+          <div class="metric">No analysis yet.</div>
+        </div>
+
+        <h2 style="margin-top: 24px;">Feedback</h2>
+        <pre id="feedbackBox">No feedback yet.</pre>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h2>Playback With Skeleton Overlay</h2>
+      <div class="video-wrap">
+        <video id="playbackVideo" controls playsinline></video>
+        <canvas id="overlayCanvas"></canvas>
+      </div>
+      <div class="status" id="analysisStatus">Record a pitch first.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      PoseLandmarker,
+      FilesetResolver
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+
+    const liveVideo = document.getElementById("liveVideo");
+    const playbackVideo = document.getElementById("playbackVideo");
+    const overlayCanvas = document.getElementById("overlayCanvas");
+    const liveOverlayCanvas = document.getElementById("liveOverlayCanvas");
+
+    const startCameraButton = document.getElementById("startCameraButton");
+    const startRecordButton = document.getElementById("startRecordButton");
+    const stopRecordButton = document.getElementById("stopRecordButton");
+    const analyzeButton = document.getElementById("analyzeButton");
+
+    const recordingStatus = document.getElementById("recordingStatus");
+    const analysisStatus = document.getElementById("analysisStatus");
+    const scoresBox = document.getElementById("scoresBox");
+    const feedbackBox = document.getElementById("feedbackBox");
+
+    let mediaStreamObject = null;
+    let mediaRecorderObject = null;
+    let recordedChunksArray = [];
+    let recordedVideoBlob = null;
+
+    let poseLandmarkerObject = null;
+    let poseFramesDuringRecording = [];
+    let latestReplayData = null;
+    let isRecordingActive = false;
+    let recordingStartTimeMs = 0;
+    let liveAnimationFrameId = null;
+    let replayAnimationFrameId = null;
+    let lastSavedPoseTimestampMs = -9999;
+
+    const connections = [
+      ["left_shoulder", "right_shoulder"],
+      ["left_shoulder", "left_elbow"],
+      ["left_elbow", "left_wrist"],
+      ["right_shoulder", "right_elbow"],
+      ["right_elbow", "right_wrist"],
+      ["left_shoulder", "left_hip"],
+      ["right_shoulder", "right_hip"],
+      ["left_hip", "right_hip"],
+    ];
+
+    const importantPosePointIndexes = {
+      nose: 0,
+      left_shoulder: 11,
+      right_shoulder: 12,
+      left_elbow: 13,
+      right_elbow: 14,
+      left_wrist: 15,
+      right_wrist: 16,
+      left_hip: 23,
+      right_hip: 24,
+    };
+
+    function resizeCanvasToVideo(videoElement, canvasElement) {
+      const rect = videoElement.getBoundingClientRect();
+      canvasElement.width = rect.width;
+      canvasElement.height = rect.height;
+    }
+
+    function drawCircle(ctx, x, y, radius) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function extractImportantLandmarks(landmarksArray) {
+      const simplifiedLandmarks = {};
+
+      for (const [name, index] of Object.entries(importantPosePointIndexes)) {
+        if (!landmarksArray[index]) continue;
+
+        const point = landmarksArray[index];
+        simplifiedLandmarks[name] = {
+          x: Number(point.x),
+          y: Number(point.y),
+          z: Number(point.z || 0),
+          visibility: Number(point.visibility || 0),
+        };
+      }
+
+      return simplifiedLandmarks;
+    }
+
+    function drawLandmarksOnCanvas(canvasElement, landmarks) {
+      const ctx = canvasElement.getContext("2d");
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (!landmarks) return;
+
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "#00ff66";
+      ctx.fillStyle = "#ff9900";
+
+      for (const [startName, endName] of connections) {
+        const startPoint = landmarks[startName];
+        const endPoint = landmarks[endName];
+        if (!startPoint || !endPoint) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x * canvasElement.width, startPoint.y * canvasElement.height);
+        ctx.lineTo(endPoint.x * canvasElement.width, endPoint.y * canvasElement.height);
+        ctx.stroke();
+      }
+
+      for (const pointName in landmarks) {
+        const point = landmarks[pointName];
+        drawCircle(
+          ctx,
+          point.x * canvasElement.width,
+          point.y * canvasElement.height,
+          10
+        );
+      }
+    }
+
+    async function initializePoseLandmarker() {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+
+      poseLandmarkerObject = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
+        },
+        runningMode: "VIDEO",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+    }
+
+    function startLivePoseLoop() {
+      const renderFrame = () => {
+        if (!poseLandmarkerObject || !liveVideo.videoWidth || !liveVideo.videoHeight) {
+          liveAnimationFrameId = requestAnimationFrame(renderFrame);
+          return;
+        }
+
+        resizeCanvasToVideo(liveVideo, liveOverlayCanvas);
+
+        const nowMs = performance.now();
+        const result = poseLandmarkerObject.detectForVideo(liveVideo, nowMs);
+
+        if (result && result.landmarks && result.landmarks.length > 0) {
+          const simplifiedLandmarks = extractImportantLandmarks(result.landmarks[0]);
+          drawLandmarksOnCanvas(liveOverlayCanvas, simplifiedLandmarks);
+
+          if (isRecordingActive) {
+            const elapsedMs = Math.round(nowMs - recordingStartTimeMs);
+
+            if (elapsedMs - lastSavedPoseTimestampMs >= 120) {
+              poseFramesDuringRecording.push({
+                timestamp_ms: elapsedMs,
+                landmarks: simplifiedLandmarks
+              });
+              lastSavedPoseTimestampMs = elapsedMs;
+            }
+          }
+        } else {
+          const ctx = liveOverlayCanvas.getContext("2d");
+          ctx.clearRect(0, 0, liveOverlayCanvas.width, liveOverlayCanvas.height);
+        }
+
+        liveAnimationFrameId = requestAnimationFrame(renderFrame);
+      };
+
+      if (liveAnimationFrameId) {
+        cancelAnimationFrame(liveAnimationFrameId);
+      }
+
+      renderFrame();
+    }
+
+    function getSupportedMimeType() {
+      const candidates = [
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm"
+      ];
+
+      for (const mimeType of candidates) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          return mimeType;
+        }
+      }
+
+      return "";
+    }
+
+    startCameraButton.addEventListener("click", async () => {
+      try {
+        recordingStatus.textContent = "Loading MediaPipe and requesting camera access...";
+
+        if (!poseLandmarkerObject) {
+          await initializePoseLandmarker();
+        }
+
+        mediaStreamObject = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: 1280,
+            height: 720,
+            facingMode: "user"
+          },
+          audio: true
+        });
+
+        liveVideo.srcObject = mediaStreamObject;
+
+        await new Promise((resolve) => {
+          liveVideo.onloadedmetadata = () => resolve();
+        });
+
+        await liveVideo.play();
+
+        startRecordButton.disabled = false;
+        recordingStatus.textContent = "Camera and microphone ready. Live MediaPipe overlay should appear now.";
+
+        startLivePoseLoop();
+      } catch (error) {
+        console.error(error);
+        recordingStatus.textContent = "Could not access camera, microphone, or MediaPipe.";
+      }
+    });
+
+    startRecordButton.addEventListener("click", () => {
+      if (!mediaStreamObject) {
+        recordingStatus.textContent = "Start camera first.";
+        return;
+      }
+
+      recordedChunksArray = [];
+      recordedVideoBlob = null;
+      poseFramesDuringRecording = [];
+      isRecordingActive = true;
+      recordingStartTimeMs = performance.now();
+      lastSavedPoseTimestampMs = -9999;
+
+      const mimeType = getSupportedMimeType();
+      mediaRecorderObject = new MediaRecorder(
+        mediaStreamObject,
+        mimeType ? { mimeType } : undefined
+      );
+
+      mediaRecorderObject.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksArray.push(event.data);
+        }
+      };
+
+      mediaRecorderObject.onstop = () => {
+        isRecordingActive = false;
+
+        recordedVideoBlob = new Blob(recordedChunksArray, {
+          type: mediaRecorderObject.mimeType || "video/webm"
+        });
+
+        const localVideoUrl = URL.createObjectURL(recordedVideoBlob);
+        playbackVideo.src = localVideoUrl;
+        playbackVideo.load();
+
+        analyzeButton.disabled = false;
+        recordingStatus.textContent = `Recording stopped. Captured ${poseFramesDuringRecording.length} pose frames.`;
+      };
+
+      mediaRecorderObject.start();
+      startRecordButton.disabled = true;
+      stopRecordButton.disabled = false;
+      analyzeButton.disabled = true;
+      recordingStatus.textContent = "Recording with live MediaPipe overlay...";
+    });
+
+    stopRecordButton.addEventListener("click", () => {
+      if (mediaRecorderObject && mediaRecorderObject.state !== "inactive") {
+        mediaRecorderObject.stop();
+      }
+
+      startRecordButton.disabled = false;
+      stopRecordButton.disabled = true;
+    });
+
+    analyzeButton.addEventListener("click", async () => {
+      if (!recordedVideoBlob) {
+        analysisStatus.textContent = "No recording found.";
+        return;
+      }
+
+      analysisStatus.textContent = "Uploading recording, pose data, and requesting analysis...";
+
+      const durationMs =
+        Math.round(playbackVideo.duration * 1000) ||
+        (poseFramesDuringRecording.length > 0
+          ? poseFramesDuringRecording[poseFramesDuringRecording.length - 1].timestamp_ms
+          : 0);
+
+      const formData = new FormData();
+      formData.append("video", recordedVideoBlob, "pitch_recording.webm");
+      formData.append("pose_frames_json", JSON.stringify(poseFramesDuringRecording));
+      formData.append("duration_ms", String(durationMs));
+
+      try {
+        const response = await fetch("/api/pitch/upload", {
+          method: "POST",
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || result.error) {
+          analysisStatus.textContent = result.error || "Analysis failed.";
+          feedbackBox.textContent = result.error || "Analysis failed.";
+          return;
+        }
+
+        latestReplayData = result;
+
+        scoresBox.innerHTML = `
+          <div class="metric"><strong>Overall Score:</strong> ${result.summary_scores.overall_score}</div>
+          <div class="metric"><strong>Gesture Score:</strong> ${result.summary_scores.gesture_score}</div>
+          <div class="metric"><strong>Posture Score:</strong> ${result.summary_scores.posture_score}</div>
+          <div class="metric"><strong>Steadiness Score:</strong> ${result.summary_scores.steadiness_score}</div>
+          <div class="metric"><strong>Pose Frames Saved:</strong> ${result.pose_frames.length}</div>
+          <div class="metric"><strong>Transcript:</strong> ${(result.transcript?.full_text || "").slice(0, 200)}</div>
+        `;
+
+        feedbackBox.textContent = result.final_feedback || "No final feedback returned.";
+        analysisStatus.textContent = "Analysis complete. Play the video to see skeleton + timeline feedback.";
+      } catch (error) {
+        console.error(error);
+        analysisStatus.textContent = "Upload or analysis failed.";
+        feedbackBox.textContent = "Upload or analysis failed.";
+      }
+    });
+
+    function drawReplayOverlay() {
+      if (!latestReplayData || !playbackVideo.duration) {
+        replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);
+        return;
+      }
+
+      resizeCanvasToVideo(playbackVideo, overlayCanvas);
+
+      const currentTimeMs = Math.round((playbackVideo.currentTime || 0) * 1000);
+      const poseFrames = latestReplayData.pose_frames || [];
+      const replayConnections = latestReplayData.connections || connections;
+
+      if (poseFrames.length === 0) {
+        const ctx = overlayCanvas.getContext("2d");
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);
+        return;
+      }
+
+      let nearestFrame = poseFrames[0];
+      let smallestGap = Math.abs((poseFrames[0].timestamp_ms || 0) - currentTimeMs);
+
+      for (const frame of poseFrames) {
+        const gap = Math.abs((frame.timestamp_ms || 0) - currentTimeMs);
+        if (gap < smallestGap) {
+          smallestGap = gap;
+          nearestFrame = frame;
+        }
+      }
+
+      const ctx = overlayCanvas.getContext("2d");
+      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "#00ff66";
+      ctx.fillStyle = "#ff9900";
+
+      for (const [startName, endName] of replayConnections) {
+        const startPoint = nearestFrame.landmarks[startName];
+        const endPoint = nearestFrame.landmarks[endName];
+        if (!startPoint || !endPoint) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x * overlayCanvas.width, startPoint.y * overlayCanvas.height);
+        ctx.lineTo(endPoint.x * overlayCanvas.width, endPoint.y * overlayCanvas.height);
+        ctx.stroke();
+      }
+
+      for (const pointName in nearestFrame.landmarks) {
+        const point = nearestFrame.landmarks[pointName];
+        drawCircle(
+          ctx,
+          point.x * overlayCanvas.width,
+          point.y * overlayCanvas.height,
+          10
+        );
+      }
+
+      const timelineFeedback = latestReplayData.timeline_feedback || [];
+      const matchingFeedback = timelineFeedback.find((item) =>
+        currentTimeMs >= item.start_ms && currentTimeMs <= item.end_ms
+      );
+
+      if (matchingFeedback) {
+        feedbackBox.textContent = matchingFeedback.feedback;
+      } else {
+        feedbackBox.textContent = latestReplayData.final_feedback || "No feedback available.";
+      }
+
+      replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);
+    }
+
+    playbackVideo.addEventListener("play", () => {
+      if (replayAnimationFrameId) {
+        cancelAnimationFrame(replayAnimationFrameId);
+      }
+      drawReplayOverlay();
+    });
+
+    playbackVideo.addEventListener("pause", () => {
+      if (replayAnimationFrameId) {
+        cancelAnimationFrame(replayAnimationFrameId);
+        replayAnimationFrameId = null;
+      }
+    });
+
+    playbackVideo.addEventListener("ended", () => {
+      if (replayAnimationFrameId) {
+        cancelAnimationFrame(replayAnimationFrameId);
+        replayAnimationFrameId = null;
+      }
+    });
+
+    playbackVideo.addEventListener("loadedmetadata", () => {
+      resizeCanvasToVideo(playbackVideo, overlayCanvas);
+    });
+
+    window.addEventListener("resize", () => {
+      if (liveVideo.videoWidth) {
+        resizeCanvasToVideo(liveVideo, liveOverlayCanvas);
+      }
+      if (playbackVideo.videoWidth) {
+        resizeCanvasToVideo(playbackVideo, overlayCanvas);
+      }
+    });
+  </script>
+</body>
+</html>

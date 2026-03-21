@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pitch Coach — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0b0f1a; --card:#1a2235; --border:rgba(255,255,255,0.07);
+      --accent:#3b82f6; --accent2:#06b6d4; --text:#f1f5f9;
+      --muted:#64748b; --error:#f87171; --success:#22c55e;
+    }
+    body {
+      font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text);
+      min-height:100vh; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    }
+    .blob { position:fixed; border-radius:50%; filter:blur(90px); opacity:0.10; pointer-events:none; animation:float 12s ease-in-out infinite; }
+    .blob-1 { width:520px;height:520px;background:radial-gradient(circle,#3b82f6,transparent);top:-120px;left:-120px;animation-delay:0s; }
+    .blob-2 { width:420px;height:420px;background:radial-gradient(circle,#06b6d4,transparent);bottom:-100px;right:-100px;animation-delay:5s; }
+    .blob-3 { width:300px;height:300px;background:radial-gradient(circle,#8b5cf6,transparent);top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:2.5s; }
+    @keyframes float { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-28px) scale(1.04)} }
+    .grid-bg { position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);background-size:44px 44px;pointer-events:none; }
+    .card { position:relative;z-index:10;width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:48px 40px;box-shadow:0 32px 64px rgba(0,0,0,0.5),0 0 80px rgba(59,130,246,0.07);animation:rise 0.55s cubic-bezier(0.16,1,0.3,1) both; }
+    @keyframes rise { from{opacity:0;transform:translateY(28px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .brand { display:flex;align-items:center;gap:12px;margin-bottom:32px; }
+    .brand-icon { width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 16px rgba(59,130,246,0.35);flex-shrink:0; }
+    .brand-name { font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-0.3px;line-height:1; }
+    .brand-status { font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px; }
+    .dot { width:6px;height:6px;background:var(--success);border-radius:50%;animation:pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.75)} }
+    .heading { margin-bottom:28px; }
+    .heading h2 { font-family:'Syne',sans-serif;font-size:26px;font-weight:700;letter-spacing:-0.4px;line-height:1.2; }
+    .heading p { margin-top:6px;font-size:14px;color:var(--muted); }
+    .error-banner { display:none;align-items:center;gap:8px;padding:11px 14px;background:rgba(248,113,113,0.10);border:1px solid rgba(248,113,113,0.22);border-radius:10px;color:var(--error);font-size:13px;margin-bottom:18px;animation:shake 0.4s ease; }
+    .error-banner.show { display:flex; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
+    .form-group { margin-bottom:16px; }
+    label { display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:0.7px;text-transform:uppercase;margin-bottom:7px; }
+    .input-wrap { position:relative; }
+    .input-icon { position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--muted);pointer-events:none; }
+    input[type="text"], input[type="password"] { width:100%;padding:13px 14px 13px 40px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:all 0.2s; }
+    input::placeholder { color:var(--muted); }
+    input:focus { border-color:var(--accent);background:rgba(59,130,246,0.06);box-shadow:0 0 0 3px rgba(59,130,246,0.13); }
+    .pw-toggle { position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:4px;transition:color 0.2s;line-height:1; }
+    .pw-toggle:hover { color:var(--text); }
+    .btn { width:100%;padding:14px;margin-top:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;border:none;border-radius:11px;cursor:pointer;letter-spacing:0.3px;transition:all 0.2s;box-shadow:0 4px 20px rgba(59,130,246,0.28); }
+    .btn:hover { transform:translateY(-1px);box-shadow:0 8px 28px rgba(59,130,246,0.42); }
+    .btn:active { transform:translateY(0); }
+    .footer-hint { margin-top:24px;text-align:center;font-size:12px;color:var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="card">
+    <div class="brand">
+      <div class="brand-icon">🎤</div>
+      <div>
+        <div class="brand-name">PitchCoach</div>
+        <div class="brand-status"><span class="dot"></span> System online</div>
+      </div>
+    </div>
+    <div class="heading">
+      <h2>Welcome back</h2>
+      <p>Sign in to access your pitch dashboard</p>
+    </div>
+    <div class="error-banner" id="errorBanner">
+      <span>⚠</span> Invalid username or password. Please try again.
+    </div>
+    <form method="post" action="/login">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <div class="input-wrap">
+          <span class="input-icon">👤</span>
+          <input id="username" name="username" type="text" placeholder="Enter your username" autocomplete="username" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔒</span>
+          <input id="password" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required />
+          <button type="button" class="pw-toggle" id="pwToggle">👁</button>
+        </div>
+      </div>
+      <button type="submit" class="btn">Sign In →</button>
+    </form>
+    <div class="footer-hint">Secured with JWT &middot; Session lasts 8 hours</div>
+  </div>
+  <script>
+    if (new URLSearchParams(window.location.search).get("error") === "1") {
+      document.getElementById("errorBanner").classList.add("show");
+    }
+    const pwToggle = document.getElementById("pwToggle");
+    const pwInput  = document.getElementById("password");
+    pwToggle.addEventListener("click", () => {
+      const hidden = pwInput.type === "password";
+      pwInput.type = hidden ? "text" : "password";
+      pwToggle.textContent = hidden ? "🙈" : "👁";
+    });
+  </script>
+</body>
+</html>
