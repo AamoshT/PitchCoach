@@ -33,7 +33,7 @@
       background: #1f2937;
       border-radius: 16px;
       padding: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     }
 
     .video-wrap {
@@ -93,7 +93,7 @@
 
     .metric {
       padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     pre {
@@ -103,6 +103,7 @@
       padding: 12px;
       border-radius: 12px;
       overflow-x: auto;
+      min-height: 120px;
     }
 
     @media (max-width: 900px) {
@@ -142,6 +143,12 @@
         </div>
 
         <h2 style="margin-top: 24px;">Feedback</h2>
+
+        <div class="controls" style="margin-top: 8px; margin-bottom: 12px;">
+          <button id="playFeedbackButton" disabled>Play Feedback</button>
+          <button id="stopFeedbackButton" disabled>Stop Feedback</button>
+        </div>
+
         <pre id="feedbackBox">No feedback yet.</pre>
       </div>
     </div>
@@ -172,6 +179,9 @@
     const stopRecordButton = document.getElementById("stopRecordButton");
     const analyzeButton = document.getElementById("analyzeButton");
 
+    const playFeedbackButton = document.getElementById("playFeedbackButton");
+    const stopFeedbackButton = document.getElementById("stopFeedbackButton");
+
     const recordingStatus = document.getElementById("recordingStatus");
     const analysisStatus = document.getElementById("analysisStatus");
     const scoresBox = document.getElementById("scoresBox");
@@ -181,6 +191,9 @@
     let mediaRecorderObject = null;
     let recordedChunksArray = [];
     let recordedVideoBlob = null;
+
+    let feedbackAudioObject = null;
+    let feedbackAudioUrl = null;
 
     let poseLandmarkerObject = null;
     let poseFramesDuringRecording = [];
@@ -199,7 +212,7 @@
       ["right_elbow", "right_wrist"],
       ["left_shoulder", "left_hip"],
       ["right_shoulder", "right_hip"],
-      ["left_hip", "right_hip"],
+      ["left_hip", "right_hip"]
     ];
 
     const importantPosePointIndexes = {
@@ -211,7 +224,7 @@
       left_wrist: 15,
       right_wrist: 16,
       left_hip: 23,
-      right_hip: 24,
+      right_hip: 24
     };
 
     function resizeCanvasToVideo(videoElement, canvasElement) {
@@ -237,7 +250,7 @@
           x: Number(point.x),
           y: Number(point.y),
           z: Number(point.z || 0),
-          visibility: Number(point.visibility || 0),
+          visibility: Number(point.visibility || 0)
         };
       }
 
@@ -350,6 +363,73 @@
       }
 
       return "";
+    }
+
+    function setFeedbackText(nextText) {
+      feedbackBox.textContent = nextText || "No feedback available.";
+      playFeedbackButton.disabled = !nextText || !nextText.trim();
+      stopFeedbackButton.disabled = true;
+    }
+
+    function stopFeedbackSpeech() {
+      if (feedbackAudioObject) {
+        feedbackAudioObject.pause();
+        feedbackAudioObject.currentTime = 0;
+      }
+
+      playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
+      stopFeedbackButton.disabled = true;
+    }
+
+    async function playFeedbackAsSpeech(textToSpeak) {
+      if (!textToSpeak || !textToSpeak.trim()) {
+        setFeedbackText("No feedback available to speak.");
+        return;
+      }
+
+      try {
+        playFeedbackButton.disabled = true;
+        stopFeedbackButton.disabled = false;
+
+        if (feedbackAudioObject) {
+          feedbackAudioObject.pause();
+          feedbackAudioObject = null;
+        }
+
+        if (feedbackAudioUrl) {
+          URL.revokeObjectURL(feedbackAudioUrl);
+          feedbackAudioUrl = null;
+        }
+
+        const response = await fetch(`/api/tts?text=${encodeURIComponent(textToSpeak)}`);
+
+        if (!response.ok) {
+          const errorResult = await response.json().catch(() => null);
+          throw new Error(errorResult?.error || "TTS failed.");
+        }
+
+        const audioBlob = await response.blob();
+        feedbackAudioUrl = URL.createObjectURL(audioBlob);
+        feedbackAudioObject = new Audio(feedbackAudioUrl);
+
+        feedbackAudioObject.onended = () => {
+          playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
+          stopFeedbackButton.disabled = true;
+        };
+
+        feedbackAudioObject.onerror = () => {
+          playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
+          stopFeedbackButton.disabled = true;
+          feedbackBox.textContent = "Audio playback failed.";
+        };
+
+        await feedbackAudioObject.play();
+      } catch (error) {
+        console.error(error);
+        playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
+        stopFeedbackButton.disabled = true;
+        feedbackBox.textContent = `TTS playback failed: ${error.message}`;
+      }
     }
 
     startCameraButton.addEventListener("click", async () => {
@@ -472,7 +552,7 @@
 
         if (!response.ok || result.error) {
           analysisStatus.textContent = result.error || "Analysis failed.";
-          feedbackBox.textContent = result.error || "Analysis failed.";
+          setFeedbackText(result.error || "Analysis failed.");
           return;
         }
 
@@ -487,13 +567,22 @@
           <div class="metric"><strong>Transcript:</strong> ${(result.transcript?.full_text || "").slice(0, 200)}</div>
         `;
 
-        feedbackBox.textContent = result.final_feedback || "No final feedback returned.";
+        setFeedbackText(result.final_feedback || "No final feedback returned.");
         analysisStatus.textContent = "Analysis complete. Play the video to see skeleton + timeline feedback.";
       } catch (error) {
         console.error(error);
         analysisStatus.textContent = "Upload or analysis failed.";
-        feedbackBox.textContent = "Upload or analysis failed.";
+        setFeedbackText("Upload or analysis failed.");
       }
+    });
+
+    playFeedbackButton.addEventListener("click", () => {
+      const textToSpeak = feedbackBox.textContent || "";
+      playFeedbackAsSpeech(textToSpeak);
+    });
+
+    stopFeedbackButton.addEventListener("click", () => {
+      stopFeedbackSpeech();
     });
 
     function drawReplayOverlay() {
@@ -561,8 +650,11 @@
 
       if (matchingFeedback) {
         feedbackBox.textContent = matchingFeedback.feedback;
+        playFeedbackButton.disabled = !matchingFeedback.feedback || !matchingFeedback.feedback.trim();
       } else {
-        feedbackBox.textContent = latestReplayData.final_feedback || "No feedback available.";
+        const fallbackFeedback = latestReplayData.final_feedback || "No feedback available.";
+        feedbackBox.textContent = fallbackFeedback;
+        playFeedbackButton.disabled = !fallbackFeedback.trim();
       }
 
       replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);

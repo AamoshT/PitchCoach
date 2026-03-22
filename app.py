@@ -36,6 +36,8 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 DO_GRADIENT_API_KEY = os.getenv("DO_GRADIENT_API_KEY", "")
 DO_GRADIENT_BASE_URL = os.getenv("DO_GRADIENT_BASE_URL", "https://inference.do-ai.run/v1")
 DO_GRADIENT_MODEL = os.getenv("DO_GRADIENT_MODEL", "openai-gpt-oss-20b")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
+
 
 mongo_client = MongoClient(MONGO_URI) if MONGO_URI else None
 database = mongo_client["pitchcoach"] if mongo_client is not None else None
@@ -422,6 +424,45 @@ async def get_pitch_session(session_id: str):
     document["_id"] = str(document["_id"])
     return JSONResponse(document)
 
+@app.get("/api/tts")
+async def text_to_speech(text: str):
+    if not ELEVENLABS_API_KEY:
+        return JSONResponse({"error": "ElevenLabs API key not set"}, status_code=500)
+
+    if not text or not text.strip():
+        return JSONResponse({"error": "No text provided"}, status_code=400)
+    voice_id = ELEVENLABS_VOICE_ID
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+    headers = {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    safe_text = text.strip() 
+
+    data = {
+        "text": safe_text, # This was failing before
+        "model_id": "eleven_flash_v2_5",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75
+        }
+    }
+
+    response = requests.post(url, json=data, headers=headers, timeout=60)
+
+    print("TTS status:", response.status_code)
+    print("TTS body:", response.text[:1000])
+
+    if response.status_code != 200:
+        return JSONResponse(
+            {"error": f"TTS failed: {response.status_code} {response.text}"},
+            status_code=500
+        )
+
+    from fastapi.responses import Response
+    return Response(content=response.content, media_type="audio/mpeg")
 
 
 
