@@ -1,698 +1,396 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pitch Practice Coach</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #111827;
-      color: #f9fafb;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    h1 {
-      margin-top: 0;
-      font-size: 28px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 24px;
-    }
-
-    .card {
-      background: #1f2937;
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-    }
-
-    .video-wrap {
-      position: relative;
-      width: 100%;
-      background: #000;
-      border-radius: 12px;
-      overflow: hidden;
-      aspect-ratio: 16 / 9;
-    }
-
-    video,
-    canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    video {
-      object-fit: cover;
-      background: #000;
-    }
-
-    canvas {
-      object-fit: cover;
-      pointer-events: none;
-    }
-
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    button {
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      background: #4b5563;
-      cursor: not-allowed;
-    }
-
-    .status {
-      margin-top: 12px;
-      color: #cbd5e1;
-      font-size: 14px;
-    }
-
-    .metric {
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      background: #0f172a;
-      padding: 12px;
-      border-radius: 12px;
-      overflow-x: auto;
-      min-height: 120px;
-    }
-
-    @media (max-width: 900px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PitchCoach.AI | Recorder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #030014;
+            background-image:
+                radial-gradient(circle at 50% -20%, #3e2bce22, transparent),
+                radial-gradient(circle at 0% 100%, #6366f111, transparent);
+        }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .gradient-text { background: linear-gradient(to right, #818cf8, #c084fc, #ff67b3); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .glow-btn { box-shadow: 0 0 20px rgba(99,102,241,0.4); transition: all 0.3s ease; }
+        .glow-btn:hover { box-shadow: 0 0 35px rgba(99,102,241,0.6); transform: translateY(-2px); }
+        .glow-btn:disabled { box-shadow: none; transform: none; opacity: 0.35; cursor: not-allowed; }
+        .btn-red { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; transition: all 0.2s; }
+        .btn-red:hover:not(:disabled) { background: rgba(239,68,68,0.25); }
+        .btn-red:disabled { opacity: 0.35; cursor: not-allowed; }
+        .btn-green { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #86efac; transition: all 0.2s; }
+        .btn-green:hover:not(:disabled) { background: rgba(34,197,94,0.25); }
+        .btn-green:disabled { opacity: 0.35; cursor: not-allowed; }
+        .video-wrap { position: relative; width: 100%; background: #000; border-radius: 16px; overflow: hidden; aspect-ratio: 16/9; }
+        .video-wrap video, .video-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+        .video-wrap video { object-fit: cover; }
+        .video-wrap canvas { pointer-events: none; }
+        .rec-dot { width: 9px; height: 9px; background: #ef4444; border-radius: 50%; animation: pulse 1s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+        .score-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
+        .score-fill  { height: 100%; border-radius: 5px; transition: width 0.7s ease; }
+    </style>
 </head>
-<body>
-  <div class="container">
-    <h1>Pitch Practice Coach</h1>
-    <p>Record your pitch, upload it to Python, and replay it with body landmark overlay.</p>
+<body class="text-gray-100 min-h-screen selection:bg-indigo-500/30">
 
-    <div class="grid">
-      <div class="card">
-        <h2>Live Camera</h2>
-        <div class="video-wrap">
-          <video id="liveVideo" autoplay playsinline muted></video>
-          <canvas id="liveOverlayCanvas"></canvas>
+    <!-- Nav -->
+    <nav class="flex justify-between items-center px-8 py-5 border-b border-white/5">
+        <a href="/" class="text-xl font-extrabold tracking-tighter flex items-center gap-2 text-white" style="text-decoration:none">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg rotate-12 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+                <span class="text-white text-xs font-bold" style="transform:rotate(-12deg);display:block">AI</span>
+            </div>
+            PitchCoach.AI
+        </a>
+        <div class="flex items-center gap-3">
+            <a href="/dashboard" class="glass px-5 py-2 rounded-full text-sm font-semibold hover:bg-white/10 transition" style="text-decoration:none">📊 My Progress</a>
+            <a href="/logout" class="text-sm text-gray-600 hover:text-gray-400 transition" style="text-decoration:none">Logout</a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 py-10">
+
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="inline-block px-4 py-1.5 mb-3 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-widest">
+                Live Session
+            </div>
+            <h1 class="text-4xl font-extrabold tracking-tight mb-1">
+                Practice Your <span class="gradient-text">Pitch</span>
+            </h1>
+            <p class="text-gray-500 text-sm">Record your pitch and get instant AI coaching</p>
         </div>
 
-        <div class="controls">
-          <button id="startCameraButton">Start Camera</button>
-          <button id="startRecordButton" disabled>Start Recording</button>
-          <button id="stopRecordButton" disabled>Stop Recording</button>
-          <button id="analyzeButton" disabled>Analyze Pitch</button>
+        <!-- TOP ROW: Camera | Feedback + Transcript -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+            <!-- LEFT: Live Camera -->
+            <div class="glass rounded-3xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400">Live Camera</h2>
+                    <div id="recBadge" class="hidden items-center gap-2 text-xs text-red-400 font-bold">
+                        <div class="rec-dot"></div> REC
+                    </div>
+                </div>
+
+                <div class="video-wrap mb-5">
+                    <video id="liveVideo" autoplay playsinline muted></video>
+                    <canvas id="liveOverlayCanvas"></canvas>
+                    <div id="camPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
+                        <p class="text-5xl mb-3">🎥</p>
+                        <p class="text-gray-500 text-sm">Click Start Camera</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <button id="startCameraBtn" class="glow-btn bg-indigo-600 px-6 py-2.5 rounded-2xl text-sm font-bold">Start Camera</button>
+                    <button id="startRecBtn" disabled class="btn-green px-6 py-2.5 rounded-2xl text-sm font-bold">⏺ Record</button>
+                    <button id="stopRecBtn" disabled class="btn-red px-6 py-2.5 rounded-2xl text-sm font-bold">⏹ Stop</button>
+                    <button id="analyzeBtn" disabled class="glow-btn bg-purple-700 px-6 py-2.5 rounded-2xl text-sm font-bold">🤖 Analyze</button>
+                </div>
+
+                <p class="text-gray-600 text-xs" id="statusText">Camera not started.</p>
+            </div>
+
+            <!-- RIGHT: Feedback + Transcript stacked -->
+            <div class="space-y-4 flex flex-col">
+
+                <!-- AI Feedback -->
+                <div class="glass rounded-3xl p-6 flex-1">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400">AI Feedback</h2>
+                        <div class="flex gap-2">
+                            <button id="playBtn" disabled class="btn-green px-3 py-1.5 rounded-xl text-xs font-bold">🔊 Play</button>
+                            <button id="stopBtn" disabled class="btn-red px-3 py-1.5 rounded-xl text-xs font-bold">⏹ Stop</button>
+                        </div>
+                    </div>
+                    <div id="feedbackBox" class="text-gray-400 text-sm leading-relaxed bg-black/20 rounded-2xl p-4 min-h-28">
+                        No feedback yet. Analyze your pitch to get coaching.
+                    </div>
+                </div>
+
+                <!-- Transcript -->
+                <div class="glass rounded-3xl p-6 flex-1">
+                    <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3">Transcript</h2>
+                    <div id="transcriptBox" class="text-gray-500 text-sm leading-relaxed italic bg-black/20 rounded-2xl p-4 min-h-16">
+                        Your speech appears here after analysis.
+                    </div>
+                </div>
+
+            </div>
         </div>
 
-        <div class="status" id="recordingStatus">Camera not started.</div>
-      </div>
+        <!-- BOTTOM ROW: Playback | Scores -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      <div class="card">
-        <h2>Scores</h2>
-        <div id="scoresBox">
-          <div class="metric">No analysis yet.</div>
+            <!-- Playback -->
+            <div class="glass rounded-3xl p-6">
+                <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">Playback + Skeleton</h2>
+                <div class="video-wrap">
+                    <video id="playbackVideo" controls playsinline></video>
+                    <canvas id="overlayCanvas"></canvas>
+                </div>
+                <p class="text-gray-600 text-xs mt-3" id="playbackStatus">Record a pitch first.</p>
+            </div>
+
+            <!-- Scores -->
+            <div class="glass rounded-3xl p-6">
+                <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">Scores</h2>
+                <div id="scoresBox" class="text-gray-600 text-sm text-center py-8">No analysis yet.</div>
+            </div>
+
         </div>
-
-        <h2 style="margin-top: 24px;">Feedback</h2>
-
-        <div class="controls" style="margin-top: 8px; margin-bottom: 12px;">
-          <button id="playFeedbackButton" disabled>Play Feedback</button>
-          <button id="stopFeedbackButton" disabled>Stop Feedback</button>
-        </div>
-
-        <pre id="feedbackBox">No feedback yet.</pre>
-      </div>
     </div>
 
-    <div class="card" style="margin-top: 24px;">
-      <h2>Playback With Skeleton Overlay</h2>
-      <div class="video-wrap">
-        <video id="playbackVideo" controls playsinline></video>
-        <canvas id="overlayCanvas"></canvas>
-      </div>
-      <div class="status" id="analysisStatus">Record a pitch first.</div>
-    </div>
-  </div>
+    <footer class="text-center py-8 border-t border-white/5 opacity-40 text-xs tracking-widest font-bold uppercase mt-10">
+        © 2026 PitchCoach.AI — Built for DigitalOcean Inference
+    </footer>
 
-  <script type="module">
-    import {
-      PoseLandmarker,
-      FilesetResolver
-    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+<script type="module">
+    import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-    const liveVideo = document.getElementById("liveVideo");
-    const playbackVideo = document.getElementById("playbackVideo");
-    const overlayCanvas = document.getElementById("overlayCanvas");
-    const liveOverlayCanvas = document.getElementById("liveOverlayCanvas");
+    const liveVideo      = document.getElementById("liveVideo");
+    const playbackVideo  = document.getElementById("playbackVideo");
+    const overlayCanvas  = document.getElementById("overlayCanvas");
+    const liveCanvas     = document.getElementById("liveOverlayCanvas");
+    const startCameraBtn = document.getElementById("startCameraBtn");
+    const startRecBtn    = document.getElementById("startRecBtn");
+    const stopRecBtn     = document.getElementById("stopRecBtn");
+    const analyzeBtn     = document.getElementById("analyzeBtn");
+    const playBtn        = document.getElementById("playBtn");
+    const stopBtn        = document.getElementById("stopBtn");
+    const statusText     = document.getElementById("statusText");
+    const playbackStatus = document.getElementById("playbackStatus");
+    const scoresBox      = document.getElementById("scoresBox");
+    const feedbackBox    = document.getElementById("feedbackBox");
+    const transcriptBox  = document.getElementById("transcriptBox");
+    const recBadge       = document.getElementById("recBadge");
+    const camPlaceholder = document.getElementById("camPlaceholder");
 
-    const startCameraButton = document.getElementById("startCameraButton");
-    const startRecordButton = document.getElementById("startRecordButton");
-    const stopRecordButton = document.getElementById("stopRecordButton");
-    const analyzeButton = document.getElementById("analyzeButton");
+    let stream, recorder, chunks = [], blob, audio, audioUrl;
+    let poser, frames = [], replayData;
+    let recording = false, startMs = 0, lastSaveMs = -9999;
+    let liveRaf, replayRaf;
 
-    const playFeedbackButton = document.getElementById("playFeedbackButton");
-    const stopFeedbackButton = document.getElementById("stopFeedbackButton");
+    const JOINTS = { nose:0, left_shoulder:11, right_shoulder:12, left_elbow:13, right_elbow:14, left_wrist:15, right_wrist:16, left_hip:23, right_hip:24 };
+    const LINES  = [["left_shoulder","right_shoulder"],["left_shoulder","left_elbow"],["left_elbow","left_wrist"],["right_shoulder","right_elbow"],["right_elbow","right_wrist"],["left_shoulder","left_hip"],["right_shoulder","right_hip"],["left_hip","right_hip"]];
 
-    const recordingStatus = document.getElementById("recordingStatus");
-    const analysisStatus = document.getElementById("analysisStatus");
-    const scoresBox = document.getElementById("scoresBox");
-    const feedbackBox = document.getElementById("feedbackBox");
+    function fit(v, c) { const r = v.getBoundingClientRect(); c.width = r.width; c.height = r.height; }
+   function dot(ctx, x, y) { ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fill(); }
 
-    let mediaStreamObject = null;
-    let mediaRecorderObject = null;
-    let recordedChunksArray = [];
-    let recordedVideoBlob = null;
-
-    let feedbackAudioObject = null;
-    let feedbackAudioUrl = null;
-
-    let poseLandmarkerObject = null;
-    let poseFramesDuringRecording = [];
-    let latestReplayData = null;
-    let isRecordingActive = false;
-    let recordingStartTimeMs = 0;
-    let liveAnimationFrameId = null;
-    let replayAnimationFrameId = null;
-    let lastSavedPoseTimestampMs = -9999;
-
-    const connections = [
-      ["left_shoulder", "right_shoulder"],
-      ["left_shoulder", "left_elbow"],
-      ["left_elbow", "left_wrist"],
-      ["right_shoulder", "right_elbow"],
-      ["right_elbow", "right_wrist"],
-      ["left_shoulder", "left_hip"],
-      ["right_shoulder", "right_hip"],
-      ["left_hip", "right_hip"]
-    ];
-
-    const importantPosePointIndexes = {
-      nose: 0,
-      left_shoulder: 11,
-      right_shoulder: 12,
-      left_elbow: 13,
-      right_elbow: 14,
-      left_wrist: 15,
-      right_wrist: 16,
-      left_hip: 23,
-      right_hip: 24
-    };
-
-    function resizeCanvasToVideo(videoElement, canvasElement) {
-      const rect = videoElement.getBoundingClientRect();
-      canvasElement.width = rect.width;
-      canvasElement.height = rect.height;
-    }
-
-    function drawCircle(ctx, x, y, radius) {
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function extractImportantLandmarks(landmarksArray) {
-      const simplifiedLandmarks = {};
-
-      for (const [name, index] of Object.entries(importantPosePointIndexes)) {
-        if (!landmarksArray[index]) continue;
-
-        const point = landmarksArray[index];
-        simplifiedLandmarks[name] = {
-          x: Number(point.x),
-          y: Number(point.y),
-          z: Number(point.z || 0),
-          visibility: Number(point.visibility || 0)
-        };
-      }
-
-      return simplifiedLandmarks;
-    }
-
-    function drawLandmarksOnCanvas(canvasElement, landmarks) {
-      const ctx = canvasElement.getContext("2d");
-      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      if (!landmarks) return;
-
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = "#00ff66";
-      ctx.fillStyle = "#ff9900";
-
-      for (const [startName, endName] of connections) {
-        const startPoint = landmarks[startName];
-        const endPoint = landmarks[endName];
-        if (!startPoint || !endPoint) continue;
-
-        ctx.beginPath();
-        ctx.moveTo(startPoint.x * canvasElement.width, startPoint.y * canvasElement.height);
-        ctx.lineTo(endPoint.x * canvasElement.width, endPoint.y * canvasElement.height);
-        ctx.stroke();
-      }
-
-      for (const pointName in landmarks) {
-        const point = landmarks[pointName];
-        drawCircle(
-          ctx,
-          point.x * canvasElement.width,
-          point.y * canvasElement.height,
-          10
-        );
-      }
-    }
-
-    async function initializePoseLandmarker() {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      );
-
-      poseLandmarkerObject = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
-        },
-        runningMode: "VIDEO",
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-    }
-
-    function startLivePoseLoop() {
-      const renderFrame = () => {
-        if (!poseLandmarkerObject || !liveVideo.videoWidth || !liveVideo.videoHeight) {
-          liveAnimationFrameId = requestAnimationFrame(renderFrame);
-          return;
+    function extractLandmarks(arr) {
+        const out = {};
+        for (const [n,i] of Object.entries(JOINTS)) {
+            if (!arr[i]) continue;
+            out[n] = { x:+arr[i].x, y:+arr[i].y, z:+(arr[i].z||0), visibility:+(arr[i].visibility||0) };
         }
+        return out;
+    }
 
-        resizeCanvasToVideo(liveVideo, liveOverlayCanvas);
+    function drawSkeleton(canvas, lm, lines) {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!lm) return;
+        ctx.lineWidth = 2.5; ctx.lineWidth = 6; ctx.strokeStyle = "#00ff66"; ctx.fillStyle = "#ff9900";
+        for (const [s,e] of lines) {
+            const a = lm[s], b = lm[e];
+            if (!a||!b) continue;
+            ctx.beginPath();
+            ctx.moveTo(a.x*canvas.width, a.y*canvas.height);
+            ctx.lineTo(b.x*canvas.width, b.y*canvas.height);
+            ctx.stroke();
+        }
+        for (const n in lm) { const p = lm[n]; dot(ctx, p.x*canvas.width, p.y*canvas.height); }
+    }
 
-        const nowMs = performance.now();
-        const result = poseLandmarkerObject.detectForVideo(liveVideo, nowMs);
+    function scoreBar(label, value, emoji) {
+        const color  = value>=75 ? "#22c55e" : value>=50 ? "#eab308" : "#ef4444";
+        const tcolor = value>=75 ? "text-green-400" : value>=50 ? "text-yellow-400" : "text-red-400";
+        return `<div class="mb-4">
+            <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs text-gray-400">${emoji} ${label}</span>
+                <span class="text-sm font-bold ${tcolor}">${value}</span>
+            </div>
+            <div class="score-track"><div class="score-fill" style="width:${value}%;background:${color}"></div></div>
+        </div>`;
+    }
 
-        if (result && result.landmarks && result.landmarks.length > 0) {
-          const simplifiedLandmarks = extractImportantLandmarks(result.landmarks[0]);
-          drawLandmarksOnCanvas(liveOverlayCanvas, simplifiedLandmarks);
+    function setFeedback(text) {
+        feedbackBox.textContent = text || "No feedback available.";
+        playBtn.disabled = !text?.trim();
+        stopBtn.disabled = true;
+    }
 
-          if (isRecordingActive) {
-            const elapsedMs = Math.round(nowMs - recordingStartTimeMs);
+    async function speak(text) {
+        if (!text?.trim()) return;
+        try {
+            playBtn.disabled = true; stopBtn.disabled = false;
+            if (audio) { audio.pause(); audio = null; }
+            if (audioUrl) { URL.revokeObjectURL(audioUrl); audioUrl = null; }
+            const res = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
+            if (!res.ok) throw new Error("TTS failed");
+            audioUrl = URL.createObjectURL(await res.blob());
+            audio    = new Audio(audioUrl);
+            audio.onended = audio.onerror = () => { playBtn.disabled = false; stopBtn.disabled = true; };
+            audio.play();
+        } catch { playBtn.disabled = false; stopBtn.disabled = true; }
+    }
 
-            if (elapsedMs - lastSavedPoseTimestampMs >= 120) {
-              poseFramesDuringRecording.push({
-                timestamp_ms: elapsedMs,
-                landmarks: simplifiedLandmarks
-              });
-              lastSavedPoseTimestampMs = elapsedMs;
+    function stopSpeech() {
+        if (audio) { audio.pause(); audio.currentTime = 0; }
+        playBtn.disabled = !feedbackBox.textContent?.trim();
+        stopBtn.disabled = true;
+    }
+
+    function mimeType() {
+        for (const m of ["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"])
+            if (MediaRecorder.isTypeSupported(m)) return m;
+        return "";
+    }
+
+    async function initPoser() {
+        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
+        poser = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" },
+            runningMode:"VIDEO", numPoses:1,
+            minPoseDetectionConfidence:0.5, minPosePresenceConfidence:0.5, minTrackingConfidence:0.5
+        });
+    }
+
+    function liveLoop() {
+        const render = () => {
+            if (!poser || !liveVideo.videoWidth) { liveRaf = requestAnimationFrame(render); return; }
+            fit(liveVideo, liveCanvas);
+            const now = performance.now();
+            const res = poser.detectForVideo(liveVideo, now);
+            if (res?.landmarks?.length > 0) {
+                const lm = extractLandmarks(res.landmarks[0]);
+                drawSkeleton(liveCanvas, lm, LINES);
+                if (recording) {
+                    const elapsed = Math.round(now - startMs);
+                    if (elapsed - lastSaveMs >= 120) { frames.push({ timestamp_ms:elapsed, landmarks:lm }); lastSaveMs = elapsed; }
+                }
+            } else { liveCanvas.getContext("2d").clearRect(0,0,liveCanvas.width,liveCanvas.height); }
+            liveRaf = requestAnimationFrame(render);
+        };
+        if (liveRaf) cancelAnimationFrame(liveRaf);
+        render();
+    }
+
+    function replayLoop() {
+        if (!replayData || !playbackVideo.duration) { replayRaf = requestAnimationFrame(replayLoop); return; }
+        fit(playbackVideo, overlayCanvas);
+        const ms = Math.round((playbackVideo.currentTime||0)*1000);
+        const pf = replayData.pose_frames || [];
+        const rc = replayData.connections || LINES;
+        if (!pf.length) { overlayCanvas.getContext("2d").clearRect(0,0,overlayCanvas.width,overlayCanvas.height); replayRaf = requestAnimationFrame(replayLoop); return; }
+        let near = pf[0], gap = Math.abs((pf[0].timestamp_ms||0)-ms);
+        for (const f of pf) { const g = Math.abs((f.timestamp_ms||0)-ms); if (g<gap){gap=g;near=f;} }
+        drawSkeleton(overlayCanvas, near.landmarks, rc);
+        const match = (replayData.timeline_feedback||[]).find(i => ms>=i.start_ms && ms<=i.end_ms);
+        const text  = match ? match.feedback : (replayData.final_feedback||"No feedback available.");
+        feedbackBox.textContent = text;
+        playBtn.disabled = !text?.trim();
+        replayRaf = requestAnimationFrame(replayLoop);
+    }
+
+    startCameraBtn.addEventListener("click", async () => {
+        try {
+            statusText.textContent = "Loading MediaPipe...";
+            if (!poser) await initPoser();
+            stream = await navigator.mediaDevices.getUserMedia({ video:{width:1280,height:720,facingMode:"user"}, audio:true });
+            liveVideo.srcObject = stream;
+            await new Promise(r => { liveVideo.onloadedmetadata = () => r(); });
+            await liveVideo.play();
+            camPlaceholder.style.display = "none";
+            startRecBtn.disabled    = false;
+            startCameraBtn.disabled = true;
+            statusText.textContent  = "Camera ready.";
+            liveLoop();
+        } catch { statusText.textContent = "Could not access camera."; }
+    });
+
+    startRecBtn.addEventListener("click", () => {
+        chunks=[]; blob=null; frames=[]; recording=true;
+        startMs=performance.now(); lastSaveMs=-9999;
+        const m = mimeType();
+        recorder = new MediaRecorder(stream, m?{mimeType:m}:undefined);
+        recorder.ondataavailable = e => { if(e.data?.size>0) chunks.push(e.data); };
+        recorder.onstop = () => {
+            recording = false;
+            blob = new Blob(chunks, {type:recorder.mimeType||"video/webm"});
+            playbackVideo.src = URL.createObjectURL(blob);
+            playbackVideo.load();
+            analyzeBtn.disabled    = false;
+            startRecBtn.disabled   = false;
+            stopRecBtn.disabled    = true;
+            recBadge.classList.add("hidden");
+            recBadge.classList.remove("flex");
+            statusText.textContent = `Done. ${frames.length} pose frames captured.`;
+        };
+        recorder.start();
+        startRecBtn.disabled   = true;
+        stopRecBtn.disabled    = false;
+        analyzeBtn.disabled    = true;
+        recBadge.classList.remove("hidden");
+        recBadge.classList.add("flex");
+        statusText.textContent = "Recording...";
+    });
+
+    stopRecBtn.addEventListener("click", () => {
+        if (recorder?.state !== "inactive") recorder.stop();
+        stopRecBtn.disabled = true;
+    });
+
+    analyzeBtn.addEventListener("click", async () => {
+        if (!blob) return;
+        playbackStatus.textContent = "Uploading and analyzing...";
+        analyzeBtn.disabled    = true;
+        analyzeBtn.textContent = "⏳ Analyzing...";
+        const ms = Math.round(playbackVideo.duration*1000) || (frames.length ? frames[frames.length-1].timestamp_ms : 0);
+        const fd = new FormData();
+        fd.append("video", blob, "pitch_recording.webm");
+        fd.append("pose_frames_json", JSON.stringify(frames));
+        fd.append("duration_ms", String(ms));
+        try {
+            const res    = await fetch("/api/pitch/upload", {method:"POST", body:fd});
+            const result = await res.json();
+            if (!res.ok || result.error) {
+                playbackStatus.textContent = result.error || "Failed.";
+                analyzeBtn.disabled = false; analyzeBtn.textContent = "🤖 Analyze"; return;
             }
-          }
-        } else {
-          const ctx = liveOverlayCanvas.getContext("2d");
-          ctx.clearRect(0, 0, liveOverlayCanvas.width, liveOverlayCanvas.height);
+            replayData = result;
+            scoresBox.innerHTML =
+                scoreBar("Overall",    result.summary_scores.overall_score,    "🏆") +
+                scoreBar("Gesture",    result.summary_scores.gesture_score,    "🤲") +
+                scoreBar("Posture",    result.summary_scores.posture_score,    "🧍") +
+                scoreBar("Steadiness", result.summary_scores.steadiness_score, "⚖️");
+            transcriptBox.textContent = result.transcript?.full_text ? `"${result.transcript.full_text}"` : "No speech detected.";
+            setFeedback(result.final_feedback || "No feedback returned.");
+            playbackStatus.textContent = "Done. Play video to see skeleton.";
+            analyzeBtn.disabled    = false;
+            analyzeBtn.textContent = "🤖 Analyze";
+        } catch {
+            playbackStatus.textContent = "Upload failed.";
+            analyzeBtn.disabled    = false;
+            analyzeBtn.textContent = "🤖 Analyze";
         }
-
-        liveAnimationFrameId = requestAnimationFrame(renderFrame);
-      };
-
-      if (liveAnimationFrameId) {
-        cancelAnimationFrame(liveAnimationFrameId);
-      }
-
-      renderFrame();
-    }
-
-    function getSupportedMimeType() {
-      const candidates = [
-        "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp8,opus",
-        "video/webm"
-      ];
-
-      for (const mimeType of candidates) {
-        if (MediaRecorder.isTypeSupported(mimeType)) {
-          return mimeType;
-        }
-      }
-
-      return "";
-    }
-
-    function setFeedbackText(nextText) {
-      feedbackBox.textContent = nextText || "No feedback available.";
-      playFeedbackButton.disabled = !nextText || !nextText.trim();
-      stopFeedbackButton.disabled = true;
-    }
-
-    function stopFeedbackSpeech() {
-      if (feedbackAudioObject) {
-        feedbackAudioObject.pause();
-        feedbackAudioObject.currentTime = 0;
-      }
-
-      playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
-      stopFeedbackButton.disabled = true;
-    }
-
-    async function playFeedbackAsSpeech(textToSpeak) {
-      if (!textToSpeak || !textToSpeak.trim()) {
-        setFeedbackText("No feedback available to speak.");
-        return;
-      }
-
-      try {
-        playFeedbackButton.disabled = true;
-        stopFeedbackButton.disabled = false;
-
-        if (feedbackAudioObject) {
-          feedbackAudioObject.pause();
-          feedbackAudioObject = null;
-        }
-
-        if (feedbackAudioUrl) {
-          URL.revokeObjectURL(feedbackAudioUrl);
-          feedbackAudioUrl = null;
-        }
-
-        const response = await fetch(`/api/tts?text=${encodeURIComponent(textToSpeak)}`);
-
-        if (!response.ok) {
-          const errorResult = await response.json().catch(() => null);
-          throw new Error(errorResult?.error || "TTS failed.");
-        }
-
-        const audioBlob = await response.blob();
-        feedbackAudioUrl = URL.createObjectURL(audioBlob);
-        feedbackAudioObject = new Audio(feedbackAudioUrl);
-
-        feedbackAudioObject.onended = () => {
-          playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
-          stopFeedbackButton.disabled = true;
-        };
-
-        feedbackAudioObject.onerror = () => {
-          playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
-          stopFeedbackButton.disabled = true;
-          feedbackBox.textContent = "Audio playback failed.";
-        };
-
-        await feedbackAudioObject.play();
-      } catch (error) {
-        console.error(error);
-        playFeedbackButton.disabled = !(feedbackBox.textContent && feedbackBox.textContent.trim());
-        stopFeedbackButton.disabled = true;
-        feedbackBox.textContent = `TTS playback failed: ${error.message}`;
-      }
-    }
-
-    startCameraButton.addEventListener("click", async () => {
-      try {
-        recordingStatus.textContent = "Loading MediaPipe and requesting camera access...";
-
-        if (!poseLandmarkerObject) {
-          await initializePoseLandmarker();
-        }
-
-        mediaStreamObject = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: 1280,
-            height: 720,
-            facingMode: "user"
-          },
-          audio: true
-        });
-
-        liveVideo.srcObject = mediaStreamObject;
-
-        await new Promise((resolve) => {
-          liveVideo.onloadedmetadata = () => resolve();
-        });
-
-        await liveVideo.play();
-
-        startRecordButton.disabled = false;
-        recordingStatus.textContent = "Camera and microphone ready. Live MediaPipe overlay should appear now.";
-
-        startLivePoseLoop();
-      } catch (error) {
-        console.error(error);
-        recordingStatus.textContent = "Could not access camera, microphone, or MediaPipe.";
-      }
     });
 
-    startRecordButton.addEventListener("click", () => {
-      if (!mediaStreamObject) {
-        recordingStatus.textContent = "Start camera first.";
-        return;
-      }
+    playBtn.addEventListener("click", () => speak(feedbackBox.textContent));
+    stopBtn.addEventListener("click", stopSpeech);
 
-      recordedChunksArray = [];
-      recordedVideoBlob = null;
-      poseFramesDuringRecording = [];
-      isRecordingActive = true;
-      recordingStartTimeMs = performance.now();
-      lastSavedPoseTimestampMs = -9999;
-
-      const mimeType = getSupportedMimeType();
-      mediaRecorderObject = new MediaRecorder(
-        mediaStreamObject,
-        mimeType ? { mimeType } : undefined
-      );
-
-      mediaRecorderObject.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordedChunksArray.push(event.data);
-        }
-      };
-
-      mediaRecorderObject.onstop = () => {
-        isRecordingActive = false;
-
-        recordedVideoBlob = new Blob(recordedChunksArray, {
-          type: mediaRecorderObject.mimeType || "video/webm"
-        });
-
-        const localVideoUrl = URL.createObjectURL(recordedVideoBlob);
-        playbackVideo.src = localVideoUrl;
-        playbackVideo.load();
-
-        analyzeButton.disabled = false;
-        recordingStatus.textContent = `Recording stopped. Captured ${poseFramesDuringRecording.length} pose frames.`;
-      };
-
-      mediaRecorderObject.start();
-      startRecordButton.disabled = true;
-      stopRecordButton.disabled = false;
-      analyzeButton.disabled = true;
-      recordingStatus.textContent = "Recording with live MediaPipe overlay...";
-    });
-
-    stopRecordButton.addEventListener("click", () => {
-      if (mediaRecorderObject && mediaRecorderObject.state !== "inactive") {
-        mediaRecorderObject.stop();
-      }
-
-      startRecordButton.disabled = false;
-      stopRecordButton.disabled = true;
-    });
-
-    analyzeButton.addEventListener("click", async () => {
-      if (!recordedVideoBlob) {
-        analysisStatus.textContent = "No recording found.";
-        return;
-      }
-
-      analysisStatus.textContent = "Uploading recording, pose data, and requesting analysis...";
-
-      const durationMs =
-        Math.round(playbackVideo.duration * 1000) ||
-        (poseFramesDuringRecording.length > 0
-          ? poseFramesDuringRecording[poseFramesDuringRecording.length - 1].timestamp_ms
-          : 0);
-
-      const formData = new FormData();
-      formData.append("video", recordedVideoBlob, "pitch_recording.webm");
-      formData.append("pose_frames_json", JSON.stringify(poseFramesDuringRecording));
-      formData.append("duration_ms", String(durationMs));
-
-      try {
-        const response = await fetch("/api/pitch/upload", {
-          method: "POST",
-          body: formData
-        });
-
-        const result = await response.json();
-
-        if (!response.ok || result.error) {
-          analysisStatus.textContent = result.error || "Analysis failed.";
-          setFeedbackText(result.error || "Analysis failed.");
-          return;
-        }
-
-        latestReplayData = result;
-
-        scoresBox.innerHTML = `
-          <div class="metric"><strong>Overall Score:</strong> ${result.summary_scores.overall_score}</div>
-          <div class="metric"><strong>Gesture Score:</strong> ${result.summary_scores.gesture_score}</div>
-          <div class="metric"><strong>Posture Score:</strong> ${result.summary_scores.posture_score}</div>
-          <div class="metric"><strong>Steadiness Score:</strong> ${result.summary_scores.steadiness_score}</div>
-          <div class="metric"><strong>Pose Frames Saved:</strong> ${result.pose_frames.length}</div>
-          <div class="metric"><strong>Transcript:</strong> ${(result.transcript?.full_text || "").slice(0, 200)}</div>
-        `;
-
-        setFeedbackText(result.final_feedback || "No final feedback returned.");
-        analysisStatus.textContent = "Analysis complete. Play the video to see skeleton + timeline feedback.";
-      } catch (error) {
-        console.error(error);
-        analysisStatus.textContent = "Upload or analysis failed.";
-        setFeedbackText("Upload or analysis failed.");
-      }
-    });
-
-    playFeedbackButton.addEventListener("click", () => {
-      const textToSpeak = feedbackBox.textContent || "";
-      playFeedbackAsSpeech(textToSpeak);
-    });
-
-    stopFeedbackButton.addEventListener("click", () => {
-      stopFeedbackSpeech();
-    });
-
-    function drawReplayOverlay() {
-      if (!latestReplayData || !playbackVideo.duration) {
-        replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);
-        return;
-      }
-
-      resizeCanvasToVideo(playbackVideo, overlayCanvas);
-
-      const currentTimeMs = Math.round((playbackVideo.currentTime || 0) * 1000);
-      const poseFrames = latestReplayData.pose_frames || [];
-      const replayConnections = latestReplayData.connections || connections;
-
-      if (poseFrames.length === 0) {
-        const ctx = overlayCanvas.getContext("2d");
-        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);
-        return;
-      }
-
-      let nearestFrame = poseFrames[0];
-      let smallestGap = Math.abs((poseFrames[0].timestamp_ms || 0) - currentTimeMs);
-
-      for (const frame of poseFrames) {
-        const gap = Math.abs((frame.timestamp_ms || 0) - currentTimeMs);
-        if (gap < smallestGap) {
-          smallestGap = gap;
-          nearestFrame = frame;
-        }
-      }
-
-      const ctx = overlayCanvas.getContext("2d");
-      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = "#00ff66";
-      ctx.fillStyle = "#ff9900";
-
-      for (const [startName, endName] of replayConnections) {
-        const startPoint = nearestFrame.landmarks[startName];
-        const endPoint = nearestFrame.landmarks[endName];
-        if (!startPoint || !endPoint) continue;
-
-        ctx.beginPath();
-        ctx.moveTo(startPoint.x * overlayCanvas.width, startPoint.y * overlayCanvas.height);
-        ctx.lineTo(endPoint.x * overlayCanvas.width, endPoint.y * overlayCanvas.height);
-        ctx.stroke();
-      }
-
-      for (const pointName in nearestFrame.landmarks) {
-        const point = nearestFrame.landmarks[pointName];
-        drawCircle(
-          ctx,
-          point.x * overlayCanvas.width,
-          point.y * overlayCanvas.height,
-          10
-        );
-      }
-
-      const timelineFeedback = latestReplayData.timeline_feedback || [];
-      const matchingFeedback = timelineFeedback.find((item) =>
-        currentTimeMs >= item.start_ms && currentTimeMs <= item.end_ms
-      );
-
-      if (matchingFeedback) {
-        feedbackBox.textContent = matchingFeedback.feedback;
-        playFeedbackButton.disabled = !matchingFeedback.feedback || !matchingFeedback.feedback.trim();
-      } else {
-        const fallbackFeedback = latestReplayData.final_feedback || "No feedback available.";
-        feedbackBox.textContent = fallbackFeedback;
-        playFeedbackButton.disabled = !fallbackFeedback.trim();
-      }
-
-      replayAnimationFrameId = requestAnimationFrame(drawReplayOverlay);
-    }
-
-    playbackVideo.addEventListener("play", () => {
-      if (replayAnimationFrameId) {
-        cancelAnimationFrame(replayAnimationFrameId);
-      }
-      drawReplayOverlay();
-    });
-
-    playbackVideo.addEventListener("pause", () => {
-      if (replayAnimationFrameId) {
-        cancelAnimationFrame(replayAnimationFrameId);
-        replayAnimationFrameId = null;
-      }
-    });
-
-    playbackVideo.addEventListener("ended", () => {
-      if (replayAnimationFrameId) {
-        cancelAnimationFrame(replayAnimationFrameId);
-        replayAnimationFrameId = null;
-      }
-    });
-
-    playbackVideo.addEventListener("loadedmetadata", () => {
-      resizeCanvasToVideo(playbackVideo, overlayCanvas);
-    });
-
+    playbackVideo.addEventListener("play",           () => { if(replayRaf) cancelAnimationFrame(replayRaf); replayLoop(); });
+    playbackVideo.addEventListener("pause",          () => { if(replayRaf){cancelAnimationFrame(replayRaf);replayRaf=null;} });
+    playbackVideo.addEventListener("ended",          () => { if(replayRaf){cancelAnimationFrame(replayRaf);replayRaf=null;} });
+    playbackVideo.addEventListener("loadedmetadata", () => fit(playbackVideo, overlayCanvas));
     window.addEventListener("resize", () => {
-      if (liveVideo.videoWidth) {
-        resizeCanvasToVideo(liveVideo, liveOverlayCanvas);
-      }
-      if (playbackVideo.videoWidth) {
-        resizeCanvasToVideo(playbackVideo, overlayCanvas);
-      }
+        if(liveVideo.videoWidth)     fit(liveVideo, liveCanvas);
+        if(playbackVideo.videoWidth) fit(playbackVideo, overlayCanvas);
     });
-  </script>
+</script>
 </body>
 </html>
