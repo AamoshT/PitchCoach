@@ -117,6 +117,47 @@
     <footer class="text-center py-20 border-t border-white/5 opacity-50 text-xs tracking-widest font-bold uppercase">
         © 2026 PitchCoach.AI — Built for DigitalOcean Inference
     </footer>
+    <div id="toast" class="fixed top-1/2 left-1/2 glass px-10 py-5 rounded-2xl text-lg font-bold opacity-0 transition-all duration-300 pointer-events-none z-50 border border-indigo-500/40 text-center shadow-2xl" style="transform: translate(-50%, -50%) scale(0.9);">
+    <span id="toastMsg">🚀 Coming soon!</span>
+    </div>
+    <script>
+    const funnyMessages = [
+        " This feature is still in the oven!",
+        " Our engineers are working on it... probably.",
+        " Coming soon — we promise!",
+        " This is still in the lab.",
+        " Our devs need more coffee first.",
+        " Top secret. Check back later.",
+        " This feature is from the future.",
+        " Slow and steady wins the race... eventually.",
+    ];
 
+    function showToast() {
+        const toast = document.getElementById("toast");
+        const msg   = document.getElementById("toastMsg");
+
+        // Pick a random funny message
+        msg.textContent = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+
+        // Show it
+        toast.style.opacity = "1";
+        toast.style.transform = "translateX(-50%) translateY(0)";
+
+        // Hide after 2.5 seconds
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateX(-50%) translateY(10px)";
+        }, 2500);
+    }
+
+    // Attach to all # links
+    document.querySelectorAll('a[href="#"]').forEach(link => {
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            showToast();
+        });
+    });
+</script>
+</div>
 </body>
 </html>

@@ -19,7 +19,7 @@ import re
 load_dotenv()
 
 app = FastAPI()
-from auth import router as auth_router, verify_token, set_users_collection
+from auth import router as auth_router, verify_token, set_users_collection, get_current_username
 app.include_router(auth_router)
 app.mount("/static", StaticFiles(directory="."), name="static")
 
@@ -81,6 +81,10 @@ async def serve_app(token: str = Depends(verify_token)):
 @app.get("/recorder")
 async def serve_recorder(token: str = Depends(verify_token)):
     return FileResponse("templates/recorder.html")
+
+# @app.get("/dashboard")
+# async def serve_dashboard(token: str = Depends(verify_token)):
+#     return FileResponse("templates/dashboard.html")
 
 def calculate_summary_scores(pose_frames: list):
     if not pose_frames:
@@ -452,8 +456,8 @@ async def text_to_speech(text: str):
 
     response = requests.post(url, json=data, headers=headers, timeout=60)
 
-    print("TTS status:", response.status_code)
-    print("TTS body:", response.text[:1000])
+    # print("TTS status:", response.status_code)
+    # print("TTS body:", response.text[:1000])
 
     if response.status_code != 200:
         return JSONResponse(
