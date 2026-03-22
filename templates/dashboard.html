@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PitchCoach.AI | My Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #030014;
+            background-image:
+                radial-gradient(circle at 50% -20%, #3e2bce22, transparent),
+                radial-gradient(circle at 0% 100%, #6366f111, transparent);
+        }
+        .glass {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #818cf8, #c084fc, #ff67b3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glow-btn {
+            box-shadow: 0 0 20px rgba(99,102,241,0.4);
+            transition: all 0.3s ease;
+        }
+        .glow-btn:hover {
+            box-shadow: 0 0 35px rgba(99,102,241,0.6);
+            transform: translateY(-2px);
+        }
+        .score-ring {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 16px;
+        }
+        .card-enter {
+            animation: cardIn 0.4s ease both;
+        }
+        @keyframes cardIn {
+            from { opacity:0; transform:translateY(16px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .trend-up   { color: #22c55e; }
+        .trend-down { color: #f87171; }
+        .trend-same { color: #94a3b8; }
+        details > summary { cursor: pointer; list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] .chevron { transform: rotate(180deg); }
+        .chevron { transition: transform 0.2s; display: inline-block; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen selection:bg-indigo-500/30">
+
+    <!-- Nav -->
+    <nav class="flex justify-between items-center px-10 py-6 max-w-7xl mx-auto border-b border-white/5">
+        <a href="/" class="text-xl font-extrabold tracking-tighter flex items-center gap-2 text-white" style="text-decoration:none">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg rotate-12 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+                <span class="text-white text-sm" style="transform:rotate(-12deg);display:block">AI</span>
+            </div>
+            PitchCoach.AI
+        </a>
+        <div class="flex items-center gap-4">
+            <a href="/app" class="glass px-5 py-2 rounded-full text-sm font-semibold hover:bg-white/10 transition" style="text-decoration:none">
+                ← Back to Recorder
+            </a>
+            <a href="/logout" class="text-sm text-gray-500 hover:text-gray-300 transition" style="text-decoration:none">Logout</a>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-6 py-10">
+
+        <!-- Header -->
+        <div class="mb-10">
+            <div class="inline-block px-4 py-1.5 mb-4 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-widest">
+                Progress Tracker
+            </div>
+            <h1 class="text-4xl font-extrabold tracking-tight">
+                Your <span class="gradient-text">Dashboard</span>
+            </h1>
+            <p class="text-gray-400 mt-2 text-sm">Track your improvement across all practice sessions</p>
+        </div>
+
+        <!-- Loading state -->
+        <div id="loadingState" class="text-center py-24 text-gray-500">
+            <div class="inline-block w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-sm">Loading your sessions...</p>
+        </div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="hidden text-center py-24">
+            <div class="text-6xl mb-4">🎤</div>
+            <h3 class="text-xl font-bold mb-2">No sessions yet</h3>
+            <p class="text-gray-400 text-sm mb-6">Record your first pitch to start tracking progress</p>
+            <a href="/app" class="glow-btn bg-indigo-600 px-8 py-3 rounded-2xl text-sm font-bold inline-block" style="text-decoration:none">Start Practicing →</a>
+        </div>
+
+        <!-- Dashboard content -->
+        <div id="dashboardContent" class="hidden">
+
+            <!-- Stats row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" id="statsRow"></div>
+
+            <!-- Chart -->
+            <div class="glass rounded-3xl p-6 mb-8">
+                <h2 class="text-lg font-bold mb-1">Score Progress</h2>
+                <p class="text-gray-500 text-xs mb-4">Your scores over time across all sessions</p>
+                <canvas id="progressChart" height="80"></canvas>
+            </div>
+
+            <!-- Session cards -->
+            <div>
+                <h2 class="text-lg font-bold mb-4">Session History
+                    <span class="text-gray-500 font-normal text-sm ml-2" id="sessionCount"></span>
+                </h2>
+                <div id="sessionCards" class="space-y-4"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <footer class="text-center py-8 border-t border-white/5 opacity-50 text-xs tracking-widest font-bold uppercase mt-16">
+        © 2026 PitchCoach.AI — Built for DigitalOcean Inference
+    </footer>
+
+<script>
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function scoreColor(score) {
+        if (score >= 75) return { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.4)',  text: '#22c55e' };
+        if (score >= 50) return { bg: 'rgba(234,179,8,0.15)', border: 'rgba(234,179,8,0.4)',  text: '#eab308' };
+        return                  { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)',  text: '#ef4444' };
+    }
+
+    function formatDate(isoString) {
+        if (!isoString) return 'Unknown';
+        const d = new Date(isoString);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDuration(ms) {
+        if (!ms) return '0s';
+        const s = Math.round(ms / 1000);
+        if (s < 60) return `${s}s`;
+        return `${Math.floor(s/60)}m ${s%60}s`;
+    }
+
+    function trendIcon(current, previous) {
+        if (previous === undefined || previous === null) return '';
+        const diff = current - previous;
+        if (diff > 2)  return `<span class="trend-up ml-1">▲ +${diff.toFixed(1)}</span>`;
+        if (diff < -2) return `<span class="trend-down ml-1">▼ ${diff.toFixed(1)}</span>`;
+        return `<span class="trend-same ml-1">— same</span>`;
+    }
+
+    // ── Fetch sessions ─────────────────────────────────────────────────────────
+    async function loadDashboard() {
+        try {
+            const res  = await fetch('/api/dashboard');
+            const data = await res.json();
+
+            document.getElementById('loadingState').classList.add('hidden');
+
+            if (!data.sessions || data.sessions.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('dashboardContent').classList.remove('hidden');
+            renderStats(data.sessions);
+            renderChart(data.sessions);
+            renderCards(data.sessions);
+
+        } catch (err) {
+            document.getElementById('loadingState').innerHTML =
+                '<p class="text-red-400 text-sm">Failed to load sessions. Please refresh.</p>';
+        }
+    }
+
+    // ── Stats row ──────────────────────────────────────────────────────────────
+    function renderStats(sessions) {
+        const total    = sessions.length;
+        const latest   = sessions[0].summary_scores;
+        const oldest   = sessions[sessions.length - 1].summary_scores;
+        const avgScore = Math.round(sessions.reduce((a, s) => a + s.summary_scores.overall_score, 0) / total);
+        const improved = latest.overall_score - oldest.overall_score;
+
+        const stats = [
+            { label: 'Sessions',        value: total,                     icon: '🎤', color: 'indigo' },
+            { label: 'Avg Score',        value: `${avgScore}`,            icon: '📊', color: 'purple' },
+            { label: 'Best Score',       value: `${Math.max(...sessions.map(s => s.summary_scores.overall_score))}`, icon: '🏆', color: 'yellow' },
+            { label: 'Improvement',      value: `${improved > 0 ? '+' : ''}${improved.toFixed(1)}`, icon: improved >= 0 ? '📈' : '📉', color: improved >= 0 ? 'green' : 'red' },
+        ];
+
+        const colorMap = {
+            indigo: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400',
+            purple: 'border-purple-500/30 bg-purple-500/10 text-purple-400',
+            yellow: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400',
+            green:  'border-green-500/30  bg-green-500/10  text-green-400',
+            red:    'border-red-500/30    bg-red-500/10    text-red-400',
+        };
+
+        document.getElementById('statsRow').innerHTML = stats.map(s => `
+            <div class="glass rounded-2xl p-5">
+                <div class="text-2xl mb-2">${s.icon}</div>
+                <div class="text-2xl font-extrabold mb-1">${s.value}</div>
+                <div class="text-xs text-gray-500 uppercase tracking-widest">${s.label}</div>
+            </div>
+        `).join('');
+    }
+
+    // ── Chart ──────────────────────────────────────────────────────────────────
+    function renderChart(sessions) {
+        const reversed = [...sessions].reverse();
+        const labels   = reversed.map((s, i) => `Session ${i + 1}`);
+
+        new Chart(document.getElementById('progressChart'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Overall',
+                        data: reversed.map(s => s.summary_scores.overall_score),
+                        borderColor: '#818cf8', backgroundColor: 'rgba(129,140,248,0.1)',
+                        borderWidth: 2, tension: 0.4, fill: true, pointRadius: 4,
+                    },
+                    {
+                        label: 'Gesture',
+                        data: reversed.map(s => s.summary_scores.gesture_score),
+                        borderColor: '#c084fc', backgroundColor: 'transparent',
+                        borderWidth: 1.5, tension: 0.4, pointRadius: 3,
+                    },
+                    {
+                        label: 'Posture',
+                        data: reversed.map(s => s.summary_scores.posture_score),
+                        borderColor: '#ff67b3', backgroundColor: 'transparent',
+                        borderWidth: 1.5, tension: 0.4, pointRadius: 3,
+                    },
+                    {
+                        label: 'Steadiness',
+                        data: reversed.map(s => s.summary_scores.steadiness_score),
+                        borderColor: '#06b6d4', backgroundColor: 'transparent',
+                        borderWidth: 1.5, tension: 0.4, pointRadius: 3,
+                    },
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+                    tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8' }
+                },
+                scales: {
+                    x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { min: 0, max: 100, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                }
+            }
+        });
+    }
+
+    // ── Session cards ──────────────────────────────────────────────────────────
+    function renderCards(sessions) {
+        document.getElementById('sessionCount').textContent = `(${sessions.length} total)`;
+
+        document.getElementById('sessionCards').innerHTML = sessions.map((session, index) => {
+            const scores   = session.summary_scores;
+            const prev     = sessions[index + 1]?.summary_scores;
+            const overall  = scoreColor(scores.overall_score);
+            const gesture  = scoreColor(scores.gesture_score);
+            const posture  = scoreColor(scores.posture_score);
+            const steady   = scoreColor(scores.steadiness_score);
+            const transcript = session.transcript?.full_text || '';
+            const feedback   = session.final_feedback || '';
+
+            return `
+            <div class="glass rounded-3xl overflow-hidden card-enter" style="animation-delay:${index * 0.05}s">
+
+                <!-- Card header -->
+                <div class="p-6 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <!-- Overall score ring -->
+                        <div class="score-ring" style="background:${overall.bg}; border:2px solid ${overall.border}; color:${overall.text}">
+                            ${scores.overall_score}
+                        </div>
+                        <div>
+                            <div class="font-bold text-sm">Session ${sessions.length - index}</div>
+                            <div class="text-gray-500 text-xs mt-0.5">${formatDate(session.created_at)} · ${formatDuration(session.duration_ms)}</div>
+                        </div>
+                    </div>
+
+                    <!-- Individual scores -->
+                    <div class="flex gap-3 flex-wrap">
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 mb-1">Gesture</div>
+                            <div class="text-sm font-bold" style="color:${gesture.text}">
+                                ${scores.gesture_score}${trendIcon(scores.gesture_score, prev?.gesture_score)}
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 mb-1">Posture</div>
+                            <div class="text-sm font-bold" style="color:${posture.text}">
+                                ${scores.posture_score}${trendIcon(scores.posture_score, prev?.posture_score)}
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 mb-1">Steadiness</div>
+                            <div class="text-sm font-bold" style="color:${steady.text}">
+                                ${scores.steadiness_score}${trendIcon(scores.steadiness_score, prev?.steadiness_score)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expandable details -->
+                ${feedback || transcript ? `
+                <details class="border-t border-white/5">
+                    <summary class="px-6 py-3 flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition select-none">
+                        <span>View feedback & transcript</span>
+                        <span class="chevron">▼</span>
+                    </summary>
+                    <div class="px-6 pb-6 space-y-4">
+
+                        ${feedback ? `
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-2">AI Feedback</div>
+                            <p class="text-gray-300 text-sm leading-relaxed">${feedback}</p>
+                        </div>
+                        ` : ''}
+
+                        ${transcript ? `
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-purple-400 mb-2">Transcript</div>
+                            <p class="text-gray-400 text-sm leading-relaxed italic">"${transcript.slice(0, 400)}${transcript.length > 400 ? '...' : ''}"</p>
+                        </div>
+                        ` : ''}
+
+                    </div>
+                </details>
+                ` : ''}
+
+            </div>
+            `;
+        }).join('');
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    loadDashboard();
+</script>
+
+</body>
+</html>

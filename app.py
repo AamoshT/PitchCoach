@@ -1,3 +1,5 @@
+import token
+
 from fastapi.responses import FileResponse
 from fastapi import FastAPI, UploadFile, File, Form, Depends 
 from fastapi.middleware.cors import CORSMiddleware 
@@ -82,9 +84,9 @@ async def serve_app(token: str = Depends(verify_token)):
 async def serve_recorder(token: str = Depends(verify_token)):
     return FileResponse("templates/recorder.html")
 
-# @app.get("/dashboard")
-# async def serve_dashboard(token: str = Depends(verify_token)):
-#     return FileResponse("templates/dashboard.html")
+@app.get("/dashboard")
+async def serve_dashboard(token: str = Depends(verify_token)):
+    return FileResponse("templates/dashboard.html")
 
 def calculate_summary_scores(pose_frames: list):
     if not pose_frames:
@@ -345,6 +347,7 @@ async def upload_pitch_session(
     video: UploadFile = File(...),
     pose_frames_json: str = Form(...),
     duration_ms: int = Form(...),
+    token: str = Depends(verify_token), # Added token dependency
 ):
     if sessions_collection is None:
         return JSONResponse(
@@ -366,6 +369,7 @@ async def upload_pitch_session(
         summary_scores = calculate_summary_scores(pose_frames)
 
         initial_document = {
+            "username": get_current_username(token),# Added a line for Username retrieval
             "created_at": datetime.now(timezone.utc),
             "duration_ms": duration_ms,
             "media_filename": os.path.basename(temporary_media_path),
@@ -467,6 +471,36 @@ async def text_to_speech(text: str):
 
     from fastapi.responses import Response
     return Response(content=response.content, media_type="audio/mpeg")
+
+@app.get("/api/dashboard")
+async def get_dashboard(token: str = Depends(verify_token)):
+    if sessions_collection is None:
+        return JSONResponse({"error": "MongoDB not configured."}, status_code=500)
+ 
+    username = get_current_username(token)
+ 
+    # Fetch all sessions for this user, newest first
+    cursor = sessions_collection.find(
+        {"username": username},
+        {
+            "pose_frames": 0,    # exclude heavy pose data
+            "connections": 0,    # exclude connections
+        }
+    ).sort("created_at", -1)
+ 
+    sessions = []
+    for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        # Convert datetime to ISO string for JSON
+        if "created_at" in doc and hasattr(doc["created_at"], "isoformat"):
+            doc["created_at"] = doc["created_at"].isoformat()
+        sessions.append(doc)
+ 
+    return JSONResponse({
+        "username": username,
+        "sessions": sessions,
+        "total": len(sessions),
+    })
 
 
 
